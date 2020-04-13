@@ -1,0 +1,49 @@
+#!/usr/bin/python3
+import subprocess
+import argparse
+
+
+xrandr_info_command = 'xrandr -q | grep "^[^\ ].*" | grep -v Screen | grep -v disconnected'
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('output_screens', nargs='+', help='Display outputs left to right')
+
+    args = p.parse_args()
+
+    output_screens = args.output_screens
+
+    screen_info = subprocess.check_output([xrandr_info_command], shell=True).decode('utf-8')
+    screen_info = [line.split(' ') for line in screen_info.splitlines()]
+    screen_resolutions = {}
+    max_height = 0
+    for screen in screen_info:
+        name = screen.pop(0)
+        screen.pop(0)
+        if screen[0] == 'primary':
+            screen.pop(0)
+        resolution, offset = screen.pop(0).split('+', 1)
+        resolution = [int(x) for x in resolution.split('x')]
+        screen_resolutions[name] = resolution
+        max_height = max(max_height, resolution[1])
+
+    screen_positions = {}
+    x = 0
+    for name in output_screens:
+        w, h = screen_resolutions[name]
+        y = max_height - h
+        screen_positions[name] = x, y
+        x += w
+
+    print(output_screens)
+    cmd = ['xrandr']
+    for name, (x, y) in screen_positions.items():
+        args = ['--output', name, '--auto', '--pos', '%sx%s' % (x, y),]
+        cmd += args
+    subprocess.check_call(cmd)
+
+	
+
+if __name__ == '__main__':
+    main()
